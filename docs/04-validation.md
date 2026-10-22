@@ -21,9 +21,11 @@
   base=2038-01-19T03:14:06Z`. Quarterly full-dress "2038 GameDay" VM
   image (stage 6) until GA.
 - CI: armv7 (Debian trixie, glibc ≥ 2.34), i386, x86_64, aarch64 — all
-  with `-D_TIME_BITS=64` (A1), ASan/UBSan on fuzz targets.
-- Gates required to merge once enabled: A3 cast gate, A5 matrix, T1,
-  T2, T3.
+  with `-D_TIME_BITS=64` (A1), ASan/UBSan on fuzz targets. Local entry
+  point: `scripts/ci.sh` (gate + x86_64/i686 legs + clang-tidy);
+  cross-arch legs run in the CI provider.
+- Gates required to merge once enabled: A3 cast gate
+  (`scripts/cast-gate.sh`), A5 matrix, T1, T2, T3.
 
 ## Patch → test mapping
 

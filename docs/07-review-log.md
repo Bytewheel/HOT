@@ -33,6 +33,47 @@ compat-layer spec (`tests/spec_vet.c`, all 11 checks passing).
   cross-wrap ordering, and unsigned-source encoding. This program is
   the seed of test T2 (`docs/04-validation.md`) and should be replaced
   by the real `libhotcompat` test suite at stage 2.
+- Stage 2 (2026-10-21): `libhotcompat` landed (`include/hot/time.h`,
+  `src/hot.c`) — `tests/test_hot.c` 63/63 green on x86_64 and, via the
+  multilib toolchain, on i686 with `-m32 -D_TIME_BITS=64`
+  (`sizeof(time_t)` 8 with the flag, 4 without — A1 is load-bearing on
+  32-bit). `spec_vet.c` retained as stage-0 evidence.
+- Stage 2 continued (T3/T7, 2026-10-21): `tests/fuzz_hot.c` — 10^6
+  iterations under ASan/UBSan (detect_leaks=0 under this sandbox),
+  invariants: classification exactness vs independent reference decode,
+  era masking, `from_32`/`from_64` round-trips, `from_u32` re-encoding,
+  tagged ordering, bounded-window uniqueness/refusal (R4), wrap/saturate/
+  error policies vs independent formulas — green on x86_64 and i686
+  (2·10^5 iters). `tests/golden_hot.c` + `tests/golden_wire.txt` — 2446
+  bytes byte-exact on x86_64 and i686 (`_TIME_BITS=64` keeps the ISO 8601
+  rendering stable across width); `make golden-update` regenerates.
+- Stage 1 (2026-10-21): A3 gate landed as `scripts/cast-gate.sh`
+  (`make gate`) — greppable narrowing-cast idioms on time identifiers +
+  time-bitfield rule, `hot-cast-gate: allow` inline escape for the
+  sanctioned legacy boundary (`hot_to_32`, `spec_vet` fixtures). The gate
+  caught 3 lines on first run (all sanctioned, all resolved). A5 entry
+  point `scripts/ci.sh` (`make ci`): gate self-test (planted violations
+  rejected), x86_64 leg (`make check`), i686 leg (`-m32 -D_TIME_BITS=64`:
+  63 checks + golden byte-exact + ASan/UBSan fuzz 10^5), clang-tidy
+  `bugprone-narrowing-conversions` clean (typed coverage for the gate's
+  ident-list blind spots), armv7/aarch64 legs SKIPped to the CI provider.
+  7 ok / 1 skip / 0 fail on this host.
+- Stage 3 (2026-10-21): wire v2 + storage format landed
+  (`include/hot/wire.h`, `src/hotwire.c`, `include/hot/store.h`,
+  `src/hotstore.c`). The deferred flags-byte layout (see Remaining
+  weaknesses) is now normative in `docs/03`: bit 0 = compat bit (must
+  equal word bit 63), bits 1..7 reserved-zero, rejected nonzero.
+  Tests: `tests/test_wire.c` 56/56 (negotiation matrix incl. refusal
+  cases, HELLO round-trip, v2/v1 golden bytes, loud rejection of
+  reserved flags / compat mismatch / truncation / trailing bytes /
+  wrong-version frames — G4, and post-wrap v1 encode refusal
+  `-HOT_ERANGE` — "never an untagged truncation"); `tests/test_store.c`
+  32/32 (header round-trip + golden bytes, loud rejection of every
+  header deviation, legacy32 era-bounded conversion incl. era-2
+  selection and `-HOT_EAMBIGUOUS` refusals). New error codes
+  centralized: `HOT_ENOSPC`, `HOT_EMALFORMED` (`include/hot/time.h`).
+  i686 leg green (all four suites + sanitized fuzz); clang-tidy clean;
+  cast gate clean (12 files).
 
 ## Remaining weaknesses
 
@@ -40,7 +81,9 @@ compat-layer spec (`tests/spec_vet.c`, all 11 checks passing).
   TBD (Q5).
 - The word tag vs system status bit distinction is easy to conflate in
   dashboards; enforce a naming convention at implementation.
-- Wire v2 flags-byte layout is deferred to stage 3 design.
+- ~~Wire v2 flags-byte layout is deferred to stage 3 design.~~ Resolved
+  at stage 3: normative layout in `docs/03` (compat bit + reserved-zero
+  upper bits), validated byte-exact in `tests/test_wire.c`.
 - Filesystem/DB/protocol claims in `docs/02` are vendor-documented but
   not yet exercised against fixtures; T9/T10 cover NTP and the audit
   script; schema and format audits are stage 0 field work.

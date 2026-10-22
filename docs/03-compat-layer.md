@@ -197,6 +197,43 @@ atomic `uint64_t`. Wire order: little-endian.
 | JSON | `{"t": <int>, "hot32": true/false}` |
 | text logs | ISO 8601 + `hot32compat` marker when tagged |
 
+### Wire v2 frame (normative layout)
+
+```
+offset  size  field
+0       2     magic "H2" (0x48 0x32)
+2       2     payload length, uint16 LE
+4       1     flags byte (below) -- adjacent to the time field
+5       8     HOT time word, uint64 LE
+13      len   payload
+```
+
+Flags byte: bit 0 = compat bit (MUST equal bit 63 of the time word);
+bits 1..7 reserved, MUST be zero on send and MUST be rejected nonzero on
+receive. The v1 frame ("H1", len, int32 tstamp) encodes only representable
+times — `HOT_ERROR` policy, never an untagged truncation. A decoder fed a
+frame of the wrong version MUST error loudly (G4/R6).
+
+### Storage header (normative layout)
+
+```
+offset  size  field
+0       4     magic "HOTS" (0x48 0x4F 0x54 0x53)
+4       1     version = 1
+5       1     flags = 0x01 (entries are HOT words)
+6       1     time unit = 0 (seconds)
+7       1     time width = 8 (bytes per entry)
+8       4     entry count, uint32 LE
+12      8*n   HOT time words, uint64 LE each
+```
+
+Every field is validated on read; any deviation is `-HOT_EMALFORMED`,
+never a guess. Legacy 32-bit state files are read through
+`hot_from_32_bounded` with caller bounds (R4).
+
+Reference implementation (stage 3): `include/hot/wire.h`,
+`include/hot/store.h`, `src/hotwire.c`, `src/hotstore.c`.
+
 ## Limitations
 
 - 63-bit range (~292 billion years); era field 31 bits — both ample.

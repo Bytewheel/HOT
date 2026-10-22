@@ -4,9 +4,16 @@ Y2038 remediation program: make 64-bit Unix time work end-to-end on modern
 Linux systems (including this host), plus a compatibility layer that keeps
 32-bit-epoch data usable and unambiguous across the 2038 wrap.
 
-Status: **planning, v0.1**. This repository contains the plan only — patch
-inventory, normative design, validation plan, rollout order, and open
-questions. No production code yet.
+Status: **implementation, stages 1–3** (`docs/05-rollout.md`). Stage 1:
+A3 cast gate (`scripts/cast-gate.sh`) + A5 matrix entry point
+(`scripts/ci.sh`). Stage 2: `libhotcompat` (`include/hot/time.h`,
+`src/hot.c`), fuzz (T3) + golden wire fixtures (T7). Stage 3: wire v2 +
+storage formats behind version negotiation (`include/hot/wire.h`,
+`src/hotwire.c`, `include/hot/store.h`, `src/hotstore.c`; flags-byte
+layout normative in `docs/03`). `make check` runs the full gate — all
+suites green on x86_64 and i686 (`-m32 -D_TIME_BITS=64`). Stage 0
+audit of this host: PASS (`docs/01`). Remaining stages per rollout
+order.
 
 ## The HOT compat bit
 
@@ -36,14 +43,34 @@ can never be confused with true 64-bit time. Normative spec:
 | `docs/05-rollout.md` | rollout order, monitoring, risk register |
 | `docs/06-open-questions.md` | decisions needed; assumptions used meanwhile |
 | `docs/07-review-log.md` | findings from plan review (vetting) |
+| `include/hot/time.h` | `libhotcompat` public API (normative, `docs/03`) |
+| `include/hot/wire.h` | wire v1/v2 + HELLO codec API (F1, G2, G4) |
+| `include/hot/store.h` | storage header + legacy32 reader API (D5, E3) |
+| `src/hot.c` | `libhotcompat` implementation |
+| `src/hotwire.c` | wire codec implementation (stage 3) |
+| `src/hotstore.c` | storage codec implementation (stage 3) |
+| `Makefile` | build + `make check`/`fuzz`/`golden`/`gate`/`ci`; A1 flags (`_TIME_BITS=64`) on by default |
 | `scripts/host-audit.sh` | runnable host capability probe (see `docs/01`) |
-| `tests/spec_vet.c` | numeric verification of the `docs/03` spec (seed of test T2) |
+| `scripts/cast-gate.sh` | A3 gate: refuse narrowing casts of time values (allow-marker escape) |
+| `scripts/ci.sh` | A5 matrix entry point: gate + x86_64/i686 legs + clang-tidy |
+| `tests/test_hot.c` | T2 seed against the library (round-trip, era, ordering, policies) |
+| `tests/test_wire.c` | stage-3 wire tests: negotiation, golden bytes, loud refusal (G4) |
+| `tests/test_store.c` | stage-3 storage tests: header validation, legacy32 era conversion |
+| `tests/fuzz_hot.c` | T3 decode-fuzz harness (ASan/UBSan, deterministic PRNG) |
+| `tests/golden_hot.c` | T7 golden-fixture generator/checker (`--update` regenerates) |
+| `tests/golden_wire.txt` | T7 committed byte-exact wire fixtures |
+| `tests/spec_vet.c` | numeric verification of the `docs/03` spec (kept as stage-0 evidence) |
 
 ## Quick start
 
+    make gate
+    make check
     scripts/host-audit.sh
 
-Exit code 0 = no blocking findings for 64-bit time readiness.
+`make gate` = A3 cast gate. `make check` runs the `libhotcompat` suite
+(63 checks) + spec evidence + golden fixtures + fuzz under ASan/UBSan;
+`scripts/ci.sh` adds the i686 leg and clang-tidy. `scripts/host-audit.sh`
+exit 0 = no blocking findings for 64-bit time readiness.
 
 ## The one forbidden failure mode
 

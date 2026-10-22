@@ -40,10 +40,10 @@ int main(void) {
     chk("1901 tagged",      hot_from_32(INT32_MIN, 0), UINT64_C(0x8000000080000000));
 
     if (hot_seconds(hot_from_32(INT32_MAX, 0)) != 2147483647) { printf("FAIL seconds wrap-07\n"); fails++; } else puts("ok   seconds(wrap-07) = 2147483647");
-    if (hot_seconds(hot_from_32((int32_t)INT32_C(-2147483648), 1)) != 2147483648LL) { printf("FAIL seconds wrap-08\n"); fails++; } else puts("ok   seconds(wrap-08) = 2147483648");
+    if (hot_seconds(hot_from_32((int32_t)INT32_C(-2147483648), 1)) != 2147483648LL) { printf("FAIL seconds wrap-08\n"); fails++; } else puts("ok   seconds(wrap-08) = 2147483648"); /* hot-cast-gate: allow */
     if (hot_seconds(hot_from_32(INT32_MIN, 0)) != INT64_C(-2147483648)) { printf("FAIL seconds 1901\n"); fails++; } else puts("ok   seconds(1901) = -2147483648");
 
-    hot_time_t a = hot_from_32(INT32_MAX, 0), b = hot_from_32((int32_t)INT32_C(-2147483648), 1);
+    hot_time_t a = hot_from_32(INT32_MAX, 0), b = hot_from_32((int32_t)INT32_C(-2147483648), 1); /* hot-cast-gate: allow */
     if (!(a < b)) { printf("FAIL ordering across wrap\n"); fails++; } else puts("ok   tagged ordering across wrap");
 
     hot_time_t u1 = hot_from_u32(UINT32_C(0x80000000), 0);

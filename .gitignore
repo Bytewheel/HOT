@@ -3,3 +3,9 @@
 *.tmp
 a.out
 /tmp/
+tests/test_hot
+tests/spec_vet
+tests/golden_hot
+tests/fuzz_hot
+tests/test_wire
+tests/test_store
