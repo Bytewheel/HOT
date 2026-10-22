@@ -20,7 +20,7 @@ system is already 64-bit there (see `docs/00-scope.md`).
 | A5 | CI matrix: 32-bit (armv7, i386) + 64-bit (x86_64, aarch64), all with A1, ASan/UBSan on fuzz targets | all | Time bugs are width-dependent; the matrix is where they reliably surface. | V-A5 |
 | A6 | Container base images: glibc ≥ 2.34 or musl ≥ 1.2.0 | all | Base-image age is the usual reason 32-bit containers stay broken. | V-A6 |
 
-## B. Kernel-side (active only if ByteWheel ships kernel modules/patches)
+## B. Kernel-side (active — Q4 decided yes, 2026-10-22: ByteWheel ships kernel modules/patches)
 
 | ID | patch | applies | notes | validation |
 |----|-------|---------|-------|------------|
