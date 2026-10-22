@@ -1,7 +1,7 @@
 # ByteWheel / HOT — Handover Of Time
 
 Y2038 remediation program: make 64-bit Unix time work end-to-end on modern
-Linux systems (including this host), plus a compatibility layer that keeps
+Linux systems, plus a compatibility layer that keeps
 32-bit-epoch data usable and unambiguous across the 2038 wrap.
 
 Status: **implementation, stages 1–3** (`docs/05-rollout.md`). Stage 1:
