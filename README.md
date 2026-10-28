@@ -11,7 +11,11 @@ A3 cast gate (`scripts/cast-gate.sh`) + A5 matrix entry point
 storage formats behind version negotiation (`include/hot/wire.h`,
 `src/hotwire.c`, `include/hot/store.h`, `src/hotstore.c`; flags-byte
 layout normative in `docs/03`). `make check` runs the full gate — all
-suites green on x86_64 and i686 (`-m32 -D_TIME_BITS=64`). Stage 0
+suites green on x86_64 and i686 (`-m32 -D_TIME_BITS=64`). Stage 4
+(extensions, Q9): docs landed — normative `docs/08-extensions.md`
+(subsecond ns/as records, deep-past class, byte-order opt-in; wire v3
++ storage v2 design), `docs/04`/`docs/05` amended; implementation
+next. Stage 0
 audit of this host: PASS (`docs/01`). Remaining stages per rollout
 order.
 
@@ -43,6 +47,7 @@ can never be confused with true 64-bit time. Normative spec:
 | `docs/05-rollout.md` | rollout order, monitoring, risk register |
 | `docs/06-open-questions.md` | decisions needed; assumptions used meanwhile |
 | `docs/07-review-log.md` | findings from plan review (vetting) |
+| `docs/08-extensions.md` | normative extensions: subsecond (ns/as), deep past, byte order (Q9) |
 | `include/hot/time.h` | `libhotcompat` public API (normative, `docs/03`) |
 | `include/hot/wire.h` | wire v1/v2 + HELLO codec API (F1, G2, G4) |
 | `include/hot/store.h` | storage header + legacy32 reader API (D5, E3) |

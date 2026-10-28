@@ -1,7 +1,7 @@
 # HOT — host audit
 
 Every host (physical, VM, container base image) must pass this audit
-before rollout stage 4 (`docs/05-rollout.md`). Run
+before rollout stage 5 (`docs/05-rollout.md`). Run
 `scripts/host-audit.sh` and file the output under the host's inventory
 entry. The script checks items 1–8 below; items 9–11 are manual review,
 since no local probe can answer them.
@@ -15,7 +15,7 @@ since no local probe can answer them.
 | 3 | C library | `_TIME_BITS=64` support | glibc ≥ 2.34 or musl ≥ 1.2.0 |
 | 4 | `sizeof(time_t)` | actual compiled width of the default toolchain | 8 |
 | 5 | `_TIME_BITS=64` probe | libc honors the macro (`__TIME_BITS__ == 64`) | honored |
-| 6 | 32-bit userspace artifacts | binaries that cannot be fixed in place | none, or inventoried for stage 5 |
+| 6 | 32-bit userspace artifacts | binaries that cannot be fixed in place | none, or inventoried for stage 6 |
 | 7 | filesystems in active use | on-disk timestamp width | no 2038-limited filesystem on any hot path |
 | 8 | time synchronization client | NTP-era-rollover (2036) posture | NTS-capable client or documented era handling |
 | 9 | epoch state files | DHCP leases, caches, queues storing epoch seconds | 64-bit or HOT-tagged (E3) |
@@ -96,7 +96,7 @@ is the enforcement and artifact track:
 3. **Multilib toolchain + 32-bit loader present**
    (`-m32` links, `/lib/ld-linux.so.2`): 32-bit binaries can run here.
    Stage 0 must inventory what actually uses them (WINE stems, Steam
-   runtime, legacy tools); everything found enters stage 5.
+   runtime, legacy tools); everything found enters stage 6.
 4. **vfat at `/boot`** (the ESP, `/dev/nvme0n1p1`): FAT timestamps are
    2107-limited, 2-second granularity, local-time semantics. Kernel and
    initramfs files there will carry wrapped timestamps at 2107 — a

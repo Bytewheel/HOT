@@ -147,7 +147,7 @@ if command -v dpkg >/dev/null 2>&1; then
   [ -n "$fa" ] && found="$found (dpkg foreign arch: $(printf '%s ' $fa))"
 fi
 if [ -n "$found" ]; then
-  warn "32-bit userspace present:${found} — inventory for rollout stage 5"
+  warn "32-bit userspace present:${found} — inventory for rollout stage 6"
 else
   ok "no 32-bit userspace artifacts found in common locations"
 fi
@@ -195,7 +195,7 @@ fi
 echo
 echo "summary: $PASS pass, $WARN warn, $FAIL fail"
 if [ "$FAIL" -gt 0 ]; then
-  echo "result: FAIL — resolve [FAIL] items before rollout stage 4"
+  echo "result: FAIL — resolve [FAIL] items before rollout stage 5"
   exit 1
 fi
 echo "result: PASS — no blocking findings; manual items 9-11 of docs/01 remain"

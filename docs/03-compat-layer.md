@@ -11,6 +11,10 @@ bit records the representation. The layer also defines a host-level
 **compat status bit** that reports whether the host itself is still
 operating on 32-bit time past the wrap.
 
+Extensions — subsecond (ns/as) fraction fields, deep-past records,
+big-endian opt-in — extend this word in 12/16-byte records without
+altering anything in this document: `docs/08-extensions.md`.
+
 ## The HOT time word (normative)
 
 A HOT time word is `uint64_t`, host byte order in structs, little-endian

@@ -83,6 +83,23 @@ compat-layer spec (`tests/spec_vet.c`, all 11 checks passing).
   (15 → 14 against 14-byte frames — the size check had short-circuited
   both). `tests/test_wire.c` 57/57 on x86_64 and on i686 via
   `-m32 -D_TIME_BITS=64`.
+- Stage 4 docs (2026-10-28, Q9): `docs/08-extensions.md` landed — the
+  normative extension spec: 12/16-byte append-only fraction records
+  (ns/as; canonical-only; floored-second semantics valid for negative
+  instants), deep-past class (+2^62 bias, ns-field class bits 30–31,
+  mutually exclusive with the compat bit), LE-default/BE-opt-in byte
+  order (records only; scaffolding stays LE), wire v3 + CAPS
+  negotiation with fixed-width sessions, storage v2, `hot_word` strong
+  typedef + `_HOT_TIME_BITS` ladder, worked examples with byte dumps.
+  `docs/04` amended (T11–T14; T6/T7 extended; `_HOT_TIME_BITS` CI
+  rungs); `docs/05` stage table reconciled (Q4's kmod rides the
+  rebuild stage 6; extensions inserted as stage 4; retirement now
+  stage 9, making Q7's "stage 9" reference literal); stage references
+  in `docs/01` and `scripts/host-audit.sh` updated to the reconciled
+  numbering (the 2026-10-21 audit snapshot in `docs/01` keeps the old
+  wording as a historical record). No code changed in this step —
+  implementation order is in `docs/08`; its worked examples must be
+  numerically vetted when the code lands (the R12 lesson).
 
 ## Remaining weaknesses
 
