@@ -165,17 +165,20 @@ int main(void)
              HOT_EMALFORMED);
     {
         buf[4] = 0x03;
-        check_rc("v2 decode reserved flags bit",
-                 hot_wire_v2_decode(buf, 15, NULL, NULL, NULL),
+        check_rc("v2 decode reserved flags bits",
+                 hot_wire_v2_decode(buf, 14, NULL, NULL, NULL),
+                 HOT_EMALFORMED);
+        buf[4] = 0x02;
+        check_rc("v2 decode flags bit 1 alone -> loud error (R15)",
+                 hot_wire_v2_decode(buf, 14, NULL, NULL, NULL),
                  HOT_EMALFORMED);
         buf[4] = 0x01;
     }
     {
-        buf[4] = 0x00;
         check_rc("v2 decode compat-bit mismatch",
-                 hot_wire_v2_decode(buf, 15, NULL, NULL, NULL),
+                 hot_wire_v2_decode(buf, 14, NULL, NULL, NULL),
                  HOT_EMALFORMED);
-        buf[4] = 0x01;
+        buf[4] = 0x00;
     }
     {
         buf[0] = 'X';

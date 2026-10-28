@@ -22,6 +22,7 @@ compat-layer spec (`tests/spec_vet.c`, all 11 checks passing).
 | R12 | Worked example for 2038-01-19 03:14:08 in `docs/03` had the era nibble misplaced (`0x8000010080000000` instead of `0x8000000180000000`). | high (spec defect) | Caught by compiling the spec's examples (`tests/spec_vet.c`); doc corrected. |
 | R13 | Era extraction with a bare `w >> 32` drags the tag bit into the era field. | high (implementation trap) | Caught by the same vet run; normative extraction rule added to R2: `era = (w >> 32) & 0x7FFFFFFF`. |
 | R14 | Draft R3 claimed untagged and tagged words relate by a shift — false; and duplicate/misspelled API bullets (`-EAMBIGUOUS` vs library codes). | medium | Corrected during review; error codes unified as `HOT_EAMBIGUOUS`/`HOT_ERANGE`. |
+| R15 | Wire v2 reserved-flags mask was `0xFC`, leaving bit 1 outside the rejected set: a frame with flags = 0x02 decoded silently with the bit ignored, contradicting `docs/03` ("bits 1..7 reserved, MUST be rejected nonzero"). Found while designating the flags byte for the subsecond extension (bit 1 is the natural ns-fraction flag). The two pre-existing rejection tests passed vacuously — cap 15 against 14-byte frames, so the size check short-circuited before flags were examined. | high (implementation defect) | Fixed: `HOT_WIRE_F_RESERVED` `0xFC` → `0xFE` (`include/hot/wire.h`); regression test (flags = 0x02 alone must fail); vacuous caps repaired (15 → 14) so the reserved-flags and compat-mismatch checks are genuinely reached. `tests/test_wire.c` 57/57. |
 
 ## Verification evidence
 
@@ -74,6 +75,14 @@ compat-layer spec (`tests/spec_vet.c`, all 11 checks passing).
   centralized: `HOT_ENOSPC`, `HOT_EMALFORMED` (`include/hot/time.h`).
   i686 leg green (all four suites + sanitized fuzz); clang-tidy clean;
   cast gate clean (12 files).
+- Post-stage-3 fix (2026-10-28, R15): v2 reserved-flags mask corrected
+  (`HOT_WIRE_F_RESERVED` 0xFC → 0xFE, `include/hot/wire.h`); bit 1 was
+  silently ignored on decode. Regression test added (flags = 0x02 alone
+  → `-HOT_EMALFORMED`); the pre-existing reserved-flags and
+  compat-mismatch rejection tests were repaired to non-vacuous caps
+  (15 → 14 against 14-byte frames — the size check had short-circuited
+  both). `tests/test_wire.c` 57/57 on x86_64 and on i686 via
+  `-m32 -D_TIME_BITS=64`.
 
 ## Remaining weaknesses
 

@@ -9,7 +9,7 @@
 enum hot_wire_ver { HOT_WIRE_V_NONE = 0, HOT_WIRE_V1 = 1, HOT_WIRE_V2 = 2 };
 
 #define HOT_WIRE_F_COMPAT   UINT8_C(0x01)
-#define HOT_WIRE_F_RESERVED UINT8_C(0xFC)
+#define HOT_WIRE_F_RESERVED UINT8_C(0xFE)
 
 #define HOT_WIRE_HDR_V1   ((size_t)8)
 #define HOT_WIRE_HDR_V2   ((size_t)13)
