@@ -38,8 +38,9 @@ tests/test_hot: tests/test_hot.c $(LIB) include/hot/time.h
 tests/test_wire: tests/test_wire.c $(LIB) include/hot/wire.h include/hot/time.h include/hot/ext.h
 	$(CC) $(ALL_CFLAGS) -D_HOT_TIME_BITS=2 $(CPPFLAGS) -o $@ tests/test_wire.c $(LIB)
 
-tests/test_store: tests/test_store.c $(LIB) include/hot/store.h include/hot/time.h
-	$(CC) $(ALL_CFLAGS) $(CPPFLAGS) -o $@ tests/test_store.c $(LIB)
+# T6/T13 storage-v2 tests ride the rung-2 surface (docs/08 X11)
+tests/test_store: tests/test_store.c $(LIB) include/hot/store.h include/hot/time.h include/hot/ext.h
+	$(CC) $(ALL_CFLAGS) -D_HOT_TIME_BITS=2 $(CPPFLAGS) -o $@ tests/test_store.c $(LIB)
 
 # T11/T12 ride the rung-2 surface (docs/08 X11)
 tests/test_ext: tests/test_ext.c $(LIB) include/hot/ext.h include/hot/time.h
