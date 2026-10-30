@@ -11,7 +11,7 @@ SANFLAGS   = -fsanitize=address,undefined -fno-sanitize-recover=all
 LIB   = libhotcompat.a
 OBJS  = src/hot.o src/hotwire.o src/hotstore.o src/hotext.o
 BINS  = tests/test_hot tests/spec_vet tests/golden_hot tests/fuzz_hot \
-        tests/test_wire tests/test_store
+        tests/test_wire tests/test_store tests/test_ext
 
 all: $(LIB) $(BINS)
 
@@ -39,6 +39,10 @@ tests/test_wire: tests/test_wire.c $(LIB) include/hot/wire.h include/hot/time.h
 
 tests/test_store: tests/test_store.c $(LIB) include/hot/store.h include/hot/time.h
 	$(CC) $(ALL_CFLAGS) $(CPPFLAGS) -o $@ tests/test_store.c $(LIB)
+
+# T11/T12 ride the rung-2 surface (docs/08 X11)
+tests/test_ext: tests/test_ext.c $(LIB) include/hot/ext.h include/hot/time.h
+	$(CC) $(ALL_CFLAGS) -D_HOT_TIME_BITS=2 $(CPPFLAGS) -o $@ tests/test_ext.c $(LIB)
 
 tests/spec_vet: tests/spec_vet.c
 	$(CC) -std=c11 $(WARN) $(CFLAGS) $(CPPFLAGS) -o $@ $<
@@ -70,6 +74,7 @@ check: all
 	./tests/spec_vet
 	./tests/test_wire
 	./tests/test_store
+	./tests/test_ext
 	./tests/golden_hot
 	ASAN_OPTIONS=detect_leaks=0 ./tests/fuzz_hot
 

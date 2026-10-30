@@ -36,7 +36,7 @@ rm -rf "$t"
 step "A5 matrix leg: x86_64 native + A1, ASan/UBSan fuzz"
 make clean >/dev/null 2>&1
 if make check >/tmp/opencode/check.out 2>&1; then
-  ok "make check (63 checks + vet + golden + fuzz 1e6)"
+  ok "make check (63+34 checks + vet + golden + fuzz 1e6)"
 else
   tail -5 /tmp/opencode/check.out
   bad "make check"
@@ -45,8 +45,8 @@ fi
 step "A5 matrix leg: i686 via -m32 + A1"
 d=$(mktemp -d)
 if cc -m32 -D_TIME_BITS=64 -D_FILE_OFFSET_BITS=64 -x c -o "$d/probe" - <<< 'int main(void){return 0;}' >/dev/null 2>&1; then
-  for t in test_hot test_wire test_store golden_hot; do
-    if cc -m32 -std=c11 $W -O2 $A1 -o "$d/$t" tests/$t.c src/hot.c src/hotwire.c src/hotstore.c \
+  for t in test_hot test_wire test_store test_ext golden_hot; do
+    if cc -m32 -std=c11 $W -O2 $A1 -D_HOT_TIME_BITS=2 -o "$d/$t" tests/$t.c src/hot.c src/hotwire.c src/hotstore.c src/hotext.c \
        && "$d/$t" >/dev/null 2>&1; then
       ok "i686 $t"
     else
@@ -67,8 +67,8 @@ rm -rf "$d"
 step "A3 typed coverage: clang-tidy bugprone-narrowing-conversions"
 if command -v clang-tidy >/dev/null 2>&1; then
   if clang-tidy --checks='-*,bugprone-narrowing-conversions' --warnings-as-errors='*' \
-       src/hot.c src/hotwire.c src/hotstore.c tests/test_hot.c tests/test_wire.c tests/test_store.c tests/fuzz_hot.c tests/golden_hot.c -- \
-       -std=c11 $A1 >/tmp/opencode/tidy.out 2>&1; then
+       src/hot.c src/hotwire.c src/hotstore.c src/hotext.c tests/test_hot.c tests/test_wire.c tests/test_store.c tests/test_ext.c tests/fuzz_hot.c tests/golden_hot.c -- \
+       -std=c11 -D_HOT_TIME_BITS=2 $A1 >/tmp/opencode/tidy.out 2>&1; then
     ok "clang-tidy clean"
   else
     grep -E 'warning|error' /tmp/opencode/tidy.out | sed 's/^/     /'
