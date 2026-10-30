@@ -9,7 +9,7 @@ ALL_CFLAGS = -std=c11 $(WARN) $(CFLAGS) $(HOTFLAGS)
 SANFLAGS   = -fsanitize=address,undefined -fno-sanitize-recover=all
 
 LIB   = libhotcompat.a
-OBJS  = src/hot.o src/hotwire.o src/hotstore.o
+OBJS  = src/hot.o src/hotwire.o src/hotstore.o src/hotext.o
 BINS  = tests/test_hot tests/spec_vet tests/golden_hot tests/fuzz_hot \
         tests/test_wire tests/test_store
 
@@ -21,11 +21,15 @@ $(LIB): $(OBJS)
 src/hot.o: src/hot.c include/hot/time.h
 	$(CC) $(ALL_CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-src/hotwire.o: src/hotwire.c include/hot/wire.h include/hot/time.h
-	$(CC) $(ALL_CFLAGS) $(CPPFLAGS) -c -o $@ $<
+src/hotwire.o: src/hotwire.c include/hot/wire.h include/hot/time.h include/hot/ext.h
+	$(CC) $(ALL_CFLAGS) -D_HOT_TIME_BITS=2 $(CPPFLAGS) -c -o $@ $<
 
-src/hotstore.o: src/hotstore.c include/hot/store.h include/hot/time.h
-	$(CC) $(ALL_CFLAGS) $(CPPFLAGS) -c -o $@ $<
+src/hotstore.o: src/hotstore.c include/hot/store.h include/hot/time.h include/hot/ext.h
+	$(CC) $(ALL_CFLAGS) -D_HOT_TIME_BITS=2 $(CPPFLAGS) -c -o $@ $<
+
+# library ships at rung 2: full ext surface (docs/08 X11)
+src/hotext.o: src/hotext.c include/hot/ext.h include/hot/time.h
+	$(CC) $(ALL_CFLAGS) -D_HOT_TIME_BITS=2 $(CPPFLAGS) -c -o $@ $<
 
 tests/test_hot: tests/test_hot.c $(LIB) include/hot/time.h
 	$(CC) $(ALL_CFLAGS) $(CPPFLAGS) -o $@ tests/test_hot.c $(LIB)

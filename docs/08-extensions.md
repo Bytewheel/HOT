@@ -36,8 +36,8 @@ ns field, 4 bytes:
 31..30  class: 00 = plain, 01 = deep-past, 10/11 = reserved
 29..0   nanoseconds within the second, < 10^9
 
-as field, 8 bytes:
-63..0   attoseconds within the nanosecond, < 10^9
+as field, 4 bytes:
+31..0   attoseconds within the nanosecond, < 10^9
 ```
 
 ### Rules

@@ -41,6 +41,36 @@ static uint32_t get_le32(const uint8_t *p)
          | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 }
 
+#if _HOT_TIME_BITS >= 1
+static void put_be32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)(v >> 24);
+    p[1] = (uint8_t)(v >> 16);
+    p[2] = (uint8_t)(v >> 8);
+    p[3] = (uint8_t)v;
+}
+
+static uint32_t get_be32(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16)
+         | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+}
+
+static void put_be64(uint8_t *p, uint64_t v)
+{
+    for (int j = 0; j < 8; j++)
+        p[j] = (uint8_t)(v >> (8 * (7 - j)));
+}
+
+static uint64_t get_be64(const uint8_t *p)
+{
+    uint64_t v = 0;
+    for (int j = 0; j < 8; j++)
+        v |= (uint64_t)p[j] << (8 * (7 - j));
+    return v;
+}
+#endif /* _HOT_TIME_BITS >= 1 */
+
 uint8_t hot_wire_negotiate(uint8_t a_min, uint8_t a_max,
                            uint8_t b_min, uint8_t b_max)
 {
@@ -176,3 +206,239 @@ int hot_wire_v2_decode(const uint8_t *buf, size_t cap, hot_time_t *word,
         *len = l;
     return 0;
 }
+
+/* --- v3: CAPS + fraction records (docs/08) --- */
+
+int hot_wire_caps_encode(uint8_t *buf, size_t cap, uint8_t level,
+                         uint8_t be, size_t *out)
+{
+    if (buf == NULL || level > 2 || be > 1)
+        return HOT_EMALFORMED;
+    if (cap < HOT_WIRE_CAPS_SZ)
+        return HOT_ENOSPC;
+    buf[0] = (uint8_t)'H';
+    buf[1] = (uint8_t)'C';
+    buf[2] = level;
+    buf[3] = be;
+    if (out != NULL)
+        *out = HOT_WIRE_CAPS_SZ;
+    return 0;
+}
+
+int hot_wire_caps_decode(const uint8_t *buf, size_t cap,
+                         uint8_t *level, uint8_t *be)
+{
+    if (buf == NULL || cap != HOT_WIRE_CAPS_SZ)
+        return HOT_EMALFORMED;
+    if (buf[0] != (uint8_t)'H' || buf[1] != (uint8_t)'C')
+        return HOT_EMALFORMED;
+    if (buf[2] > 2 || buf[3] > 1)
+        return HOT_EMALFORMED;
+    if (level != NULL)
+        *level = buf[2];
+    if (be != NULL)
+        *be = buf[3];
+    return 0;
+}
+
+#if _HOT_TIME_BITS >= 1
+
+static size_t v3_width(uint8_t level)
+{
+    return (size_t)8 + (size_t)4 * (size_t)level;
+}
+
+static uint8_t v3_level_bits(uint8_t level)
+{
+    switch (level) {
+    case 0:  return 0;
+    case 1:  return HOT_WIRE_F_NS;
+    default: return (uint8_t)(HOT_WIRE_F_NS | HOT_WIRE_F_AS);
+    }
+}
+
+int hot_wire_v3_encode(uint8_t *buf, size_t cap, const hot_word_ns *rec,
+                       uint8_t level, uint8_t be, const uint8_t *payload,
+                       uint16_t len, size_t *out)
+{
+    hot_word_ns vet;
+    size_t w;
+
+    if (buf == NULL || rec == NULL || (len > 0 && payload == NULL))
+        return HOT_EMALFORMED;
+    if (level > 1 || be > 1)
+        return HOT_EMALFORMED;
+    if (hot_word_ns_unpack(rec->w, rec->ns, &vet) != 0)
+        return HOT_EMALFORMED;              /* X3/X4/X6 */
+    if (level == 0 && rec->ns != 0)
+        return HOT_ERANGE;                  /* X12 fraction, X7 class */
+    w = v3_width(level);
+    if (cap < HOT_WIRE_HDR_V3 + w + (size_t)len)
+        return HOT_ENOSPC;
+    buf[0] = (uint8_t)'H';
+    buf[1] = (uint8_t)'3';
+    put_le16(buf + 2, len);                 /* always LE (X9) */
+    buf[4] = (uint8_t)(v3_level_bits(level)
+                       | (be != 0 ? HOT_WIRE_F_BE : 0)
+                       | (hot_is_compat(rec->w) ? HOT_WIRE_F_COMPAT : 0));
+    if (be != 0) {
+        put_be64(buf + HOT_WIRE_HDR_V3, rec->w);
+        if (level == 1)
+            put_be32(buf + HOT_WIRE_HDR_V3 + 8, rec->ns);
+    } else {
+        put_le64(buf + HOT_WIRE_HDR_V3, rec->w);
+        if (level == 1)
+            put_le32(buf + HOT_WIRE_HDR_V3 + 8, rec->ns);
+    }
+    if (len > 0)
+        memcpy(buf + HOT_WIRE_HDR_V3 + w, payload, (size_t)len);
+    if (out != NULL)
+        *out = HOT_WIRE_HDR_V3 + w + (size_t)len;
+    return 0;
+}
+
+int hot_wire_v3_decode(const uint8_t *buf, size_t cap, uint8_t level,
+                       uint8_t be, hot_word_ns *rec,
+                       const uint8_t **payload, uint16_t *len)
+{
+    size_t w;
+    uint16_t l;
+    uint8_t flags;
+    uint64_t word;
+    uint32_t ns_raw = 0;
+
+    if (buf == NULL || rec == NULL)
+        return HOT_EMALFORMED;
+    if (level > 1 || be > 1)
+        return HOT_EMALFORMED;
+    w = v3_width(level);
+    if (cap < HOT_WIRE_HDR_V3 + w)
+        return HOT_EMALFORMED;
+    if (buf[0] != (uint8_t)'H' || buf[1] != (uint8_t)'3')
+        return HOT_EMALFORMED;
+    l = get_le16(buf + 2);                  /* always LE (X9) */
+    flags = buf[4];
+    if ((flags & HOT_WIRE_F_RESERVED_V3) != 0)
+        return HOT_EMALFORMED;
+    if ((flags & (HOT_WIRE_F_NS | HOT_WIRE_F_AS)) != v3_level_bits(level))
+        return HOT_EMALFORMED;              /* frame/session mismatch */
+    if ((flags & HOT_WIRE_F_BE) != (be != 0 ? HOT_WIRE_F_BE : 0))
+        return HOT_EMALFORMED;              /* frame/session mismatch */
+    if (cap != HOT_WIRE_HDR_V3 + w + (size_t)l)
+        return HOT_EMALFORMED;
+    word = (be != 0) ? get_be64(buf + HOT_WIRE_HDR_V3)
+                     : get_le64(buf + HOT_WIRE_HDR_V3);
+    if (level == 1)
+        ns_raw = (be != 0) ? get_be32(buf + HOT_WIRE_HDR_V3 + 8)
+                           : get_le32(buf + HOT_WIRE_HDR_V3 + 8);
+    if (((flags & HOT_WIRE_F_COMPAT) != 0) != hot_is_compat(word))
+        return HOT_EMALFORMED;
+    if (hot_word_ns_unpack(word, ns_raw, rec) != 0)
+        return HOT_EMALFORMED;              /* X3/X4/X6 */
+    if (payload != NULL)
+        *payload = buf + HOT_WIRE_HDR_V3 + w;
+    if (len != NULL)
+        *len = l;
+    return 0;
+}
+
+#endif /* _HOT_TIME_BITS >= 1 */
+
+#if _HOT_TIME_BITS >= 2
+
+int hot_wire_v3_encode_as(uint8_t *buf, size_t cap, const hot_word_as *rec,
+                          uint8_t level, uint8_t be, const uint8_t *payload,
+                          uint16_t len, size_t *out)
+{
+    hot_word_as vet;
+    size_t w;
+
+    if (buf == NULL || rec == NULL || (len > 0 && payload == NULL))
+        return HOT_EMALFORMED;
+    if (level > 2 || be > 1)
+        return HOT_EMALFORMED;
+    if (hot_word_as_unpack(rec->w, rec->ns, rec->as, &vet) != 0)
+        return HOT_EMALFORMED;              /* X3/X4/X6 */
+    if (level == 0 && (rec->ns != 0 || rec->as != 0))
+        return HOT_ERANGE;                  /* X12 fraction, X7 class */
+    if (level == 1 && rec->as != 0)
+        return HOT_ERANGE;                  /* X12 */
+    w = v3_width(level);
+    if (cap < HOT_WIRE_HDR_V3 + w + (size_t)len)
+        return HOT_ENOSPC;
+    buf[0] = (uint8_t)'H';
+    buf[1] = (uint8_t)'3';
+    put_le16(buf + 2, len);                 /* always LE (X9) */
+    buf[4] = (uint8_t)(v3_level_bits(level)
+                       | (be != 0 ? HOT_WIRE_F_BE : 0)
+                       | (hot_is_compat(rec->w) ? HOT_WIRE_F_COMPAT : 0));
+    if (be != 0) {
+        put_be64(buf + HOT_WIRE_HDR_V3, rec->w);
+        if (level >= 1)
+            put_be32(buf + HOT_WIRE_HDR_V3 + 8, rec->ns);
+        if (level == 2)
+            put_be32(buf + HOT_WIRE_HDR_V3 + 12, (uint32_t)rec->as);
+    } else {
+        put_le64(buf + HOT_WIRE_HDR_V3, rec->w);
+        if (level >= 1)
+            put_le32(buf + HOT_WIRE_HDR_V3 + 8, rec->ns);
+        if (level == 2)
+            put_le32(buf + HOT_WIRE_HDR_V3 + 12, (uint32_t)rec->as);
+    }
+    if (len > 0)
+        memcpy(buf + HOT_WIRE_HDR_V3 + w, payload, (size_t)len);
+    if (out != NULL)
+        *out = HOT_WIRE_HDR_V3 + w + (size_t)len;
+    return 0;
+}
+
+int hot_wire_v3_decode_as(const uint8_t *buf, size_t cap, uint8_t level,
+                          uint8_t be, hot_word_as *rec,
+                          const uint8_t **payload, uint16_t *len)
+{
+    size_t w;
+    uint16_t l;
+    uint8_t flags;
+    uint64_t word;
+    uint32_t ns_raw = 0;
+    uint64_t as = 0;
+
+    if (buf == NULL || rec == NULL)
+        return HOT_EMALFORMED;
+    if (level > 2 || be > 1)
+        return HOT_EMALFORMED;
+    w = v3_width(level);
+    if (cap < HOT_WIRE_HDR_V3 + w)
+        return HOT_EMALFORMED;
+    if (buf[0] != (uint8_t)'H' || buf[1] != (uint8_t)'3')
+        return HOT_EMALFORMED;
+    l = get_le16(buf + 2);                  /* always LE (X9) */
+    flags = buf[4];
+    if ((flags & HOT_WIRE_F_RESERVED_V3) != 0)
+        return HOT_EMALFORMED;
+    if ((flags & (HOT_WIRE_F_NS | HOT_WIRE_F_AS)) != v3_level_bits(level))
+        return HOT_EMALFORMED;              /* frame/session mismatch */
+    if ((flags & HOT_WIRE_F_BE) != (be != 0 ? HOT_WIRE_F_BE : 0))
+        return HOT_EMALFORMED;              /* frame/session mismatch */
+    if (cap != HOT_WIRE_HDR_V3 + w + (size_t)l)
+        return HOT_EMALFORMED;
+    word = (be != 0) ? get_be64(buf + HOT_WIRE_HDR_V3)
+                     : get_le64(buf + HOT_WIRE_HDR_V3);
+    if (level >= 1)
+        ns_raw = (be != 0) ? get_be32(buf + HOT_WIRE_HDR_V3 + 8)
+                           : get_le32(buf + HOT_WIRE_HDR_V3 + 8);
+    if (level == 2)
+        as = (be != 0) ? (uint64_t)get_be32(buf + HOT_WIRE_HDR_V3 + 12)
+                       : (uint64_t)get_le32(buf + HOT_WIRE_HDR_V3 + 12);
+    if (((flags & HOT_WIRE_F_COMPAT) != 0) != hot_is_compat(word))
+        return HOT_EMALFORMED;
+    if (hot_word_as_unpack(word, ns_raw, as, rec) != 0)
+        return HOT_EMALFORMED;              /* X3/X4/X6 */
+    if (payload != NULL)
+        *payload = buf + HOT_WIRE_HDR_V3 + w;
+    if (len != NULL)
+        *len = l;
+    return 0;
+}
+
+#endif /* _HOT_TIME_BITS >= 2 */
