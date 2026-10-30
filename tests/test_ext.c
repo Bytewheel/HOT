@@ -297,7 +297,88 @@ int main(void)
                                    UINT32_C(500000000), &taggedhalf) == 0,
           "X8 setup: -0.5 s deep and tagged records");
     check(hot_word_ns_cmp(&deephalf, &taggedhalf) == 0,
-          "X8: deep -0.5 s == tagged -0.5 s (same instant)");
+           "X8: deep -0.5 s == tagged -0.5 s (same instant)");
+
+    puts("== T12: plain constructors refuse pre-1970 (-HOT_ERANGE, R1) ==");
+    check(hot_word_ns_plain(-1, 0, &e) == HOT_ERANGE
+              && hot_word_ns_plain(INT64_MIN, 0, &e) == HOT_ERANGE,
+          "ns_plain(-1) / ns_plain(INT64_MIN) -> -HOT_ERANGE");
+    check(hot_word_as_plain(-1, 0, 0, &ea) == HOT_ERANGE
+              && hot_word_as_plain(INT64_MIN, 0, 0, &ea) == HOT_ERANGE,
+          "as_plain(-1) / as_plain(INT64_MIN) -> -HOT_ERANGE");
+
+    puts("== T12: deep bias round-trip at [-2^62, 2^62) boundaries +-1 ==");
+    bad = 0;
+    {
+        static const int64_t DEEP_OK[] = {
+            -INT64_C(4611686018427387904),
+            -INT64_C(4611686018427387903),
+            INT64_C(4611686018427387902),
+            INT64_C(4611686018427387903)
+        };
+        for (size_t i = 0; i < sizeof DEEP_OK / sizeof *DEEP_OK; i++) {
+            int64_t s = DEEP_OK[i];
+            hot_word_ns a = {1, 1};
+            hot_word_as b = {1, 1, 1};
+            if (hot_word_ns_deep(s, 0, &a) != 0 || a.w != deep_want(s)
+                || a.ns != HOT_NS_CLASS_DEEP || !hot_word_ns_is_deep(&a)
+                || hot_word_ns_seconds(&a) != s)
+                bad++;
+            if (hot_word_as_deep(s, 1, 2, &b) != 0 || b.w != deep_want(s)
+                || b.ns != (HOT_NS_CLASS_DEEP | 1u) || b.as != 2
+                || hot_word_as_seconds(&b) != s)
+                bad++;
+        }
+    }
+    check(bad == 0,
+          "deep(-2^62)/(-2^62+1)/(2^62-2)/(2^62-1) exact seconds recovery");
+    check(hot_word_ns_deep(-INT64_C(4611686018427387904), 0, &e) == 0
+              && e.w == 0,
+          "deep(-2^62) word = 0 (bias low end)");
+    check(hot_word_ns_deep(INT64_C(4611686018427387903), 0, &e) == 0
+              && e.w == UINT64_C(0x7FFFFFFFFFFFFFFF),
+          "deep(2^62-1) word = 0x7FFFFFFFFFFFFFFF (bias high end)");
+    check(hot_word_ns_deep(-INT64_C(4611686018427387905), 0, &e)
+              == HOT_ERANGE,
+          "deep(-2^62-1) -> -HOT_ERANGE");
+    check(hot_word_ns_deep(INT64_C(4611686018427387904), 0, &e)
+              == HOT_ERANGE,
+          "deep(2^62) -> -HOT_ERANGE");
+    check(hot_word_as_deep(-INT64_C(4611686018427387905), 0, 0, &ea)
+              == HOT_ERANGE
+              && hot_word_as_deep(INT64_C(4611686018427387904), 0, 0, &ea)
+              == HOT_ERANGE,
+          "as_deep(-2^62-1) / as_deep(2^62) -> -HOT_ERANGE");
+
+    puts("== T12: X6 class/compat mutual exclusion ==");
+    bad = 0;
+    {
+        static const uint64_t TAGGED[] = {
+            UINT64_C(0x8000000000000000), UINT64_C(0x8000000080000000),
+            UINT64_C(0x8000000180000000), UINT64_MAX
+        };
+        for (size_t i = 0; i < sizeof TAGGED / sizeof *TAGGED; i++) {
+            hot_word_ns a = {0, 0};
+            hot_word_as b = {0, 0, 0};
+            if (hot_word_ns_unpack(TAGGED[i], HOT_NS_CLASS_DEEP, &a)
+                != HOT_EMALFORMED)
+                bad++;
+            if (hot_word_ns_unpack(TAGGED[i],
+                                   HOT_NS_CLASS_DEEP | UINT32_C(999999999),
+                                   &a) != HOT_EMALFORMED)
+                bad++;
+            if (hot_word_as_unpack(TAGGED[i], HOT_NS_CLASS_DEEP, 0, &b)
+                != HOT_EMALFORMED)
+                bad++;
+        }
+    }
+    check(bad == 0,
+          "deep class with word bit 63 set -> -HOT_EMALFORMED (12 cases)");
+
+    puts("== T12: from_timespec out of deep range -> -HOT_ERANGE ==");
+    struct timespec tsd = { INT64_MIN, 0 };
+    check(hot_word_ns_from_timespec(&tsd, &e) == HOT_ERANGE,
+          "from_timespec(tv_sec = INT64_MIN) -> -HOT_ERANGE");
 
     puts("== T11 property: 100000 random samples, levels 1-2 (fixed seed) ==");
     for (uint32_t i = 0; i < 100000; i++) {
